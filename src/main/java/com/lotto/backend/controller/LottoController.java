@@ -1,7 +1,11 @@
 package com.lotto.backend.controller;
 
+import com.lotto.backend.filter.LottoFilterChainManager;
+import com.lotto.backend.model.dto.EnhancedLottoRequest;
 import com.lotto.backend.model.dto.LottoRecommendRequest;
+import com.lotto.backend.model.dto.LottoRecommendationResponse;
 import com.lotto.backend.model.entity.LottoResult;
+import com.lotto.backend.service.EnhancedLottoRecommendService;
 import com.lotto.backend.service.LottoAnalysisService;
 import com.lotto.backend.service.LottoRecommendService;
 import com.lotto.backend.service.LottoResultService;
@@ -12,14 +16,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
-@RequestMapping("/lotto")
+@RequestMapping("/api/lotto")
 @RequiredArgsConstructor
 public class LottoController {
     private final LottoRecommendService lottoRecommendService;
     private final LottoResultService lottoResultService;
     private final LottoAnalysisService lottoAnalysisService;
+    private final EnhancedLottoRecommendService enhancedRecommendService;
+    private final LottoFilterChainManager filterChainManager;
 
     @GetMapping("/all/round")
     public void insertAllRound(){
@@ -67,6 +74,36 @@ public class LottoController {
         return lottoAnalysisService.totalWinsOverThePastYears(years, limit);
     }
     
+    // 끝자리 통계 분석
+    @GetMapping(value = "/analyzeLastDigit")
+    public Map<String, Object> analyzeLastDigit(){
+        return lottoAnalysisService.analyzeLastDigitStatistics();
+    }
+    
+    // 피보나치 패턴 통계
+    @GetMapping(value = "/analyzeFibonacci")
+    public Map<String, Object> analyzeFibonacci(){
+        return lottoAnalysisService.analyzeFibonacciPattern();
+    }
+    
+    // 완전제곱수 패턴 통계
+    @GetMapping(value = "/analyzePerfectSquare")
+    public Map<String, Object> analyzePerfectSquare(){
+        return lottoAnalysisService.analyzePerfectSquarePattern();
+    }
+    
+    // 배수 패턴 통계
+    @GetMapping(value = "/analyzeMultiples")
+    public Map<String, Object> analyzeMultiples(){
+        return lottoAnalysisService.analyzeMultiplePatterns();
+    }
+    
+    // 소수 패턴 통계
+    @GetMapping(value = "/analyzePrime")
+    public Map<String, Object> analyzePrime(){
+        return lottoAnalysisService.analyzePrimePattern();
+    }
+    
     // 향상된 추천 기능
     @PostMapping("/recommend/advanced")
     public List<List<Integer>> getAdvancedRecommend(@RequestBody LottoRecommendRequest request) {
@@ -88,5 +125,26 @@ public class LottoController {
         }
         
         return lottoRecommendService.generateWheelingSystem(baseNumbers, systemSize);
+    }
+    
+    // 필터 기반 향상된 추천
+    @PostMapping("/recommend/enhanced")
+    public List<LottoRecommendationResponse> getEnhancedRecommend(@RequestBody EnhancedLottoRequest request) {
+        if (request.getCount() < 1 || request.getCount() > 10) {
+            throw new IllegalArgumentException("추천번호 요청 갯수는 1~10개까지 가능합니다.");
+        }
+        return enhancedRecommendService.recommendMultiple(request);
+    }
+    
+    // 사용 가능한 필터 목록 조회
+    @GetMapping("/filters")
+    public Set<String> getAvailableFilters() {
+        return filterChainManager.getAllFilterNames();
+    }
+    
+    // 필터 상태 조회
+    @GetMapping("/filters/status")
+    public Map<String, Boolean> getFilterStatus() {
+        return filterChainManager.getFilterStatus();
     }
 }

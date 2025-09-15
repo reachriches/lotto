@@ -1,0 +1,57 @@
+plugins {
+	id 'java'
+	id 'war'
+	id 'org.springframework.boot' version '3.4.2'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.lotto'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'com.amazonaws:aws-java-sdk-lambda:1.12.300'
+	compileOnly 'org.projectlombok:lombok'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	runtimeOnly 'org.postgresql:postgresql'
+	annotationProcessor 'org.projectlombok:lombok'
+	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Vue 프로젝트 빌드 및 Spring Boot static 폴더로 복사하는 태스크들
+//task buildFrontend(type: Exec) {
+//	workingDir 'frontend'  // Vue 프로젝트의 디렉토리 경로
+//	commandLine 'pnpm', 'run', 'build'  // Vue 애플리케이션 빌드
+//}
+//
+//task copyFrontendToBackend(type: Copy) {
+//	dependsOn buildFrontend
+//	from 'frontend/dist'  // Vue 빌드 결과물 경로
+//	into 'src/main/resources/static'  // Spring Boot의 static 폴더로 복사
+//}
+
+// 빌드 후 프론트엔드 파일을 자동으로 복사하도록 설정
+//build.dependsOn copyFrontendToBackend
+
+tasks.named('test') {
+	useJUnitPlatform()
+}

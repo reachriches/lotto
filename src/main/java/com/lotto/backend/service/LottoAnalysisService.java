@@ -179,6 +179,299 @@ public class LottoAnalysisService {
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
     }
+    
+    // 끝자리 통계 분석 - 같은 끝자리가 몇 개씩 나왔는지 통계
+    public Map<String, Object> analyzeLastDigitStatistics() {
+        List<LottoResult> allResults = repository.findAll();
+        Map<Integer, Integer> lastDigitCountDistribution = new HashMap<>(); // key: 같은 끝자리 개수, value: 발생 횟수
+        List<Map<String, Object>> detailList = new ArrayList<>();
+        
+        for (LottoResult result : allResults) {
+            Map<Integer, Integer> lastDigitCount = new HashMap<>();
+            
+            // 각 번호의 끝자리 카운트
+            for (int number : result.getWinningNumbers()) {
+                int lastDigit = number % 10;
+                lastDigitCount.put(lastDigit, lastDigitCount.getOrDefault(lastDigit, 0) + 1);
+            }
+            
+            // 가장 많이 나온 끝자리 개수 찾기
+            int maxCount = lastDigitCount.values().stream()
+                    .max(Integer::compare)
+                    .orElse(0);
+            
+            // 통계에 추가
+            lastDigitCountDistribution.put(maxCount, 
+                lastDigitCountDistribution.getOrDefault(maxCount, 0) + 1);
+            
+            // 3개 이상인 경우 상세 정보 저장
+            if (maxCount >= 3) {
+                Map<String, Object> detail = new HashMap<>();
+                detail.put("round", result.getRound());
+                detail.put("numbers", result.getWinningNumbers());
+                detail.put("maxCount", maxCount);
+                detail.put("lastDigitDetail", lastDigitCount);
+                detailList.add(detail);
+            }
+        }
+        
+        // 결과 정리
+        Map<String, Object> statistics = new HashMap<>();
+        statistics.put("totalRounds", allResults.size());
+        statistics.put("distribution", lastDigitCountDistribution);
+        statistics.put("percentage", calculatePercentage(lastDigitCountDistribution, allResults.size()));
+        statistics.put("samplesWithThreeOrMore", detailList.size());
+        statistics.put("detailSamples", detailList.stream().limit(10).collect(Collectors.toList())); // 최근 10개만
+        
+        return statistics;
+    }
+    
+    private Map<Integer, String> calculatePercentage(Map<Integer, Integer> distribution, int total) {
+        Map<Integer, String> percentageMap = new HashMap<>();
+        for (Map.Entry<Integer, Integer> entry : distribution.entrySet()) {
+            double percentage = (entry.getValue() * 100.0) / total;
+            percentageMap.put(entry.getKey(), String.format("%.2f%%", percentage));
+        }
+        return percentageMap;
+    }
+    
+    // 피보나치 수열 패턴 통계 분석
+    public Map<String, Object> analyzeFibonacciPattern() {
+        List<LottoResult> allResults = repository.findAll();
+        Set<Integer> fibonacciNumbers = Set.of(1, 2, 3, 5, 8, 13, 21, 34);
+        Map<Integer, Integer> fibCountDistribution = new HashMap<>();
+        List<Map<String, Object>> detailList = new ArrayList<>();
+        
+        for (LottoResult result : allResults) {
+            long fibCount = result.getWinningNumbers().stream()
+                    .filter(fibonacciNumbers::contains)
+                    .count();
+            
+            fibCountDistribution.put((int)fibCount, 
+                fibCountDistribution.getOrDefault((int)fibCount, 0) + 1);
+            
+            // 4개 이상인 경우 상세 정보
+            if (fibCount >= 4) {
+                Map<String, Object> detail = new HashMap<>();
+                detail.put("round", result.getRound());
+                detail.put("numbers", result.getWinningNumbers());
+                detail.put("fibCount", fibCount);
+                detail.put("fibNumbers", result.getWinningNumbers().stream()
+                    .filter(fibonacciNumbers::contains)
+                    .collect(Collectors.toList()));
+                detailList.add(detail);
+            }
+        }
+        
+        Map<String, Object> statistics = new HashMap<>();
+        statistics.put("totalRounds", allResults.size());
+        statistics.put("distribution", fibCountDistribution);
+        statistics.put("fourOrMore", detailList.size());
+        statistics.put("fiveOrMore", detailList.stream().filter(m -> (long)m.get("fibCount") >= 5).count());
+        statistics.put("samples", detailList.stream().limit(10).collect(Collectors.toList()));
+        
+        return statistics;
+    }
+    
+    // 완전제곱수 패턴 통계 분석
+    public Map<String, Object> analyzePerfectSquarePattern() {
+        List<LottoResult> allResults = repository.findAll();
+        Set<Integer> perfectSquares = Set.of(1, 4, 9, 16, 25, 36);
+        Map<Integer, Integer> squareCountDistribution = new HashMap<>();
+        List<Map<String, Object>> detailList = new ArrayList<>();
+        
+        for (LottoResult result : allResults) {
+            long squareCount = result.getWinningNumbers().stream()
+                    .filter(perfectSquares::contains)
+                    .count();
+            
+            squareCountDistribution.put((int)squareCount, 
+                squareCountDistribution.getOrDefault((int)squareCount, 0) + 1);
+            
+            // 3개 이상인 경우 상세 정보
+            if (squareCount >= 3) {
+                Map<String, Object> detail = new HashMap<>();
+                detail.put("round", result.getRound());
+                detail.put("numbers", result.getWinningNumbers());
+                detail.put("squareCount", squareCount);
+                detail.put("squareNumbers", result.getWinningNumbers().stream()
+                    .filter(perfectSquares::contains)
+                    .collect(Collectors.toList()));
+                detailList.add(detail);
+            }
+        }
+        
+        Map<String, Object> statistics = new HashMap<>();
+        statistics.put("totalRounds", allResults.size());
+        statistics.put("distribution", squareCountDistribution);
+        statistics.put("threeOrMore", detailList.size());
+        statistics.put("fourOrMore", detailList.stream().filter(m -> (long)m.get("squareCount") >= 4).count());
+        statistics.put("samples", detailList.stream().limit(10).collect(Collectors.toList()));
+        
+        return statistics;
+    }
+    
+    // 배수 패턴 통계 분석
+    public Map<String, Object> analyzeMultiplePatterns() {
+        List<LottoResult> allResults = repository.findAll();
+        Map<String, Object> allStats = new HashMap<>();
+        
+        int[] divisors = {4, 5, 6, 7}; // 3개 - 7의배수 19 6배수 52
+        
+        for (int divisor : divisors) {
+            Map<String, Object> divisorStats = analyzeSpecificMultiple(allResults, divisor);
+            allStats.put(divisor + "의배수", divisorStats);
+        }
+        
+        allStats.put("totalRounds", allResults.size());
+        return allStats;
+    }
+    
+    private Map<String, Object> analyzeSpecificMultiple(List<LottoResult> results, int divisor) {
+        List<Integer> multiplesInRange = new ArrayList<>();
+        for (int i = divisor; i <= 45; i += divisor) {
+            multiplesInRange.add(i);
+        }
+        
+        int allMultiplesCount = 0;
+        int fiveOrMoreCount = 0;
+        int fourOrMoreCount = 0;
+        int threeOrMoreCount = 0;
+        List<Map<String, Object>> allSamples = new ArrayList<>();
+        List<Map<String, Object>> fiveSamples = new ArrayList<>();
+        List<Map<String, Object>> fourSamples = new ArrayList<>();
+        List<Map<String, Object>> threeSamples = new ArrayList<>();
+
+        for (LottoResult result : results) {
+            long multipleCount = result.getWinningNumbers().stream()
+                    .filter(multiplesInRange::contains)
+                    .count();
+            
+            if (multipleCount == 6) { // 모두 해당 배수
+                allMultiplesCount++;
+                Map<String, Object> sample = new HashMap<>();
+                sample.put("round", result.getRound());
+                sample.put("numbers", result.getWinningNumbers());
+                sample.put("count", multipleCount);
+                allSamples.add(sample);
+            }
+            
+            if (multipleCount >= 5) { // 5개 이상
+                fiveOrMoreCount++;
+                Map<String, Object> sample = new HashMap<>();
+                sample.put("round", result.getRound());
+                sample.put("numbers", result.getWinningNumbers());
+                sample.put("count", multipleCount);
+                sample.put("multipleNumbers", result.getWinningNumbers().stream()
+                    .filter(multiplesInRange::contains)
+                    .collect(Collectors.toList()));
+                fiveSamples.add(sample);
+            }
+            
+            if (multipleCount >= 4) { // 4개 이상
+                fourOrMoreCount++;
+                Map<String, Object> sample = new HashMap<>();
+                sample.put("round", result.getRound());
+                sample.put("numbers", result.getWinningNumbers());
+                sample.put("count", multipleCount);
+                sample.put("multipleNumbers", result.getWinningNumbers().stream()
+                    .filter(multiplesInRange::contains)
+                    .collect(Collectors.toList()));
+                fourSamples.add(sample);
+            }
+
+            if (multipleCount >= 3) { // 3개 이상
+                threeOrMoreCount++;
+                Map<String, Object> sample = new HashMap<>();
+                sample.put("round", result.getRound());
+                sample.put("numbers", result.getWinningNumbers());
+                sample.put("count", multipleCount);
+                sample.put("multipleNumbers", result.getWinningNumbers().stream()
+                        .filter(multiplesInRange::contains)
+                        .collect(Collectors.toList()));
+                threeSamples.add(sample);
+            }
+        }
+        
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("availableMultiples", multiplesInRange);
+        stats.put("availableCount", multiplesInRange.size());
+        stats.put("allMultiplesWins", allMultiplesCount);
+        stats.put("fiveOrMoreWins", fiveOrMoreCount);
+        stats.put("fourOrMoreWins", fourOrMoreCount);
+        stats.put("threeOrMoreWins", threeOrMoreCount);
+        stats.put("allSamples", allSamples);
+        stats.put("fiveOrMoreSamples", fiveSamples.stream().limit(10).collect(Collectors.toList()));
+        stats.put("fourOrMoreSamples", fourSamples.stream().limit(10).collect(Collectors.toList()));
+        stats.put("threeOrMoreSamples", threeSamples.stream().limit(10).collect(Collectors.toList()));
+
+        return stats;
+    }
+    
+    // 소수 패턴 통계 분석
+    public Map<String, Object> analyzePrimePattern() {
+        List<LottoResult> allResults = repository.findAll();
+        Set<Integer> primes = Set.of(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43);
+        
+        int fourOrMoreCount = 0;
+        int fiveOrMoreCount = 0;
+        int sixCount = 0;
+        List<Map<String, Object>> fourOrMoreSamples = new ArrayList<>();
+        List<Map<String, Object>> fiveOrMoreSamples = new ArrayList<>();
+        List<Map<String, Object>> sixSamples = new ArrayList<>();
+        
+        for (LottoResult result : allResults) {
+            long primeCount = result.getWinningNumbers().stream()
+                    .filter(primes::contains)
+                    .count();
+            
+            if (primeCount == 6) { // 모두 소수
+                sixCount++;
+                Map<String, Object> sample = new HashMap<>();
+                sample.put("round", result.getRound());
+                sample.put("numbers", result.getWinningNumbers());
+                sample.put("count", primeCount);
+                sixSamples.add(sample);
+            }
+            
+            if (primeCount >= 5) { // 5개 이상
+                fiveOrMoreCount++;
+                Map<String, Object> sample = new HashMap<>();
+                sample.put("round", result.getRound());
+                sample.put("numbers", result.getWinningNumbers());
+                sample.put("count", primeCount);
+                sample.put("primeNumbers", result.getWinningNumbers().stream()
+                    .filter(primes::contains)
+                    .collect(Collectors.toList()));
+                fiveOrMoreSamples.add(sample);
+            }
+            
+            if (primeCount >= 4) { // 4개 이상
+                fourOrMoreCount++;
+                Map<String, Object> sample = new HashMap<>();
+                sample.put("round", result.getRound());
+                sample.put("numbers", result.getWinningNumbers());
+                sample.put("count", primeCount);
+                sample.put("primeNumbers", result.getWinningNumbers().stream()
+                    .filter(primes::contains)
+                    .collect(Collectors.toList()));
+                fourOrMoreSamples.add(sample);
+            }
+        }
+        
+        Map<String, Object> statistics = new HashMap<>();
+        statistics.put("totalRounds", allResults.size());
+        statistics.put("availablePrimes", primes.stream().sorted().collect(Collectors.toList()));
+        statistics.put("availableCount", primes.size());
+        statistics.put("sixPrimeWins", sixCount);
+        statistics.put("fiveOrMoreWins", fiveOrMoreCount);
+        statistics.put("fourOrMoreWins", fourOrMoreCount);
+        statistics.put("sixSamples", sixSamples);
+        statistics.put("fiveOrMoreSamples", fiveOrMoreSamples.stream().limit(10).collect(Collectors.toList()));
+        statistics.put("fourOrMoreSamples", fourOrMoreSamples.stream().limit(10).collect(Collectors.toList()));
+        
+        return statistics;
+    }
 
     //추천번호 분석용으로 만들었는데 언제 어떻게 쓸지 아직 정확히 모르겠음.
     //iterations: 추천번호를 몇 번 생성할지 결정 (ex: testGeneratedNumbers(1000, 3) → 1000번 생성해서 3~4개 이상 같은 그룹에 나온 경우 찾기)

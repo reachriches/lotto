@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/lotto/statistics")
+@RequestMapping("/api/lotto/statistics")
 @RequiredArgsConstructor
 public class LottoStatisticsController {
     private final LottoStatisticsService statisticsService;
