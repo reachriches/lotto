@@ -235,6 +235,71 @@ public class LottoAnalysisService {
         return percentageMap;
     }
     
+    // 같은 자리수(10단위) 통계 분석
+    public Map<String, Object> analyzeSameRangeStatistics() {
+        List<LottoResult> allResults = repository.findAll();
+        Map<Integer, Integer> rangeCountDistribution = new HashMap<>();
+        List<Map<String, Object>> detailList = new ArrayList<>();
+
+        for (LottoResult result : allResults) {
+            Map<Integer, Integer> groupCount = new HashMap<>();
+            Map<Integer, List<Integer>> groupNumbers = new HashMap<>();
+
+            // 각 번호의 자리수(10단위) 카운트
+            for (int number : result.getWinningNumbers()) {
+                int group = (number - 1) / 10; // 0: 1~10, 1: 11~20, 2: 21~30, 3: 31~40, 4: 41~45
+                groupCount.put(group, groupCount.getOrDefault(group, 0) + 1);
+                groupNumbers.computeIfAbsent(group, k -> new ArrayList<>()).add(number);
+            }
+
+            // 가장 많이 나온 자리수 개수 찾기
+            int maxCount = groupCount.values().stream()
+                    .max(Integer::compare)
+                    .orElse(0);
+
+            // 통계에 추가
+            rangeCountDistribution.put(maxCount,
+                rangeCountDistribution.getOrDefault(maxCount, 0) + 1);
+
+            // 3개 이상인 경우 상세 정보 저장
+            if (maxCount >= 3) {
+                Map<String, Object> detail = new HashMap<>();
+                detail.put("round", result.getRound());
+                detail.put("numbers", result.getWinningNumbers());
+                detail.put("maxCount", maxCount);
+
+                // 어느 그룹에서 몇 개씩 나왔는지 정리
+                Map<String, String> rangeDetail = new HashMap<>();
+                if (!groupNumbers.getOrDefault(0, new ArrayList<>()).isEmpty())
+                    rangeDetail.put("1~10", groupNumbers.get(0).toString());
+                if (!groupNumbers.getOrDefault(1, new ArrayList<>()).isEmpty())
+                    rangeDetail.put("11~20", groupNumbers.get(1).toString());
+                if (!groupNumbers.getOrDefault(2, new ArrayList<>()).isEmpty())
+                    rangeDetail.put("21~30", groupNumbers.get(2).toString());
+                if (!groupNumbers.getOrDefault(3, new ArrayList<>()).isEmpty())
+                    rangeDetail.put("31~40", groupNumbers.get(3).toString());
+                if (!groupNumbers.getOrDefault(4, new ArrayList<>()).isEmpty())
+                    rangeDetail.put("41~45", groupNumbers.get(4).toString());
+                detail.put("rangeDetail", rangeDetail);
+
+                detailList.add(detail);
+            }
+        }
+
+        // 결과 정리
+        Map<String, Object> statistics = new HashMap<>();
+        statistics.put("totalRounds", allResults.size());
+        statistics.put("distribution", rangeCountDistribution);
+        statistics.put("percentage", calculatePercentage(rangeCountDistribution, allResults.size()));
+        statistics.put("threeOrMore", detailList.size());
+        statistics.put("fourOrMore", detailList.stream().filter(m -> (int)m.get("maxCount") >= 4).count());
+        statistics.put("fiveOrMore", detailList.stream().filter(m -> (int)m.get("maxCount") >= 5).count());
+        statistics.put("sixCount", detailList.stream().filter(m -> (int)m.get("maxCount") == 6).count());
+        statistics.put("detailSamples", detailList.stream().limit(10).collect(Collectors.toList()));
+
+        return statistics;
+    }
+
     // 피보나치 수열 패턴 통계 분석
     public Map<String, Object> analyzeFibonacciPattern() {
         List<LottoResult> allResults = repository.findAll();

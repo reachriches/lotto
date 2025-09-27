@@ -60,10 +60,18 @@ public class PatternExclusionFilter implements LottoFilter {
             totalScore -= 0.4;
         }
         
-        // 4. 같은 끝자리 3개 이상 ( 총 90회 가량 출현으로 애매하지만 제외하는 방향으로 감. 싫으면 빼거나 4개이상으로 했을 시 낮은확률이라 제외가능)
-        if (hasSameLastDigit(sorted)) {
-            violations.add("같은 끝자리 3개 이상");
-            totalScore -= 0.2;
+        // 4. 같은 끝자리 검사
+        int sameLastDigitCount = getSameLastDigitMaxCount(sorted);
+        if (sameLastDigitCount >= 3) {
+            violations.add("같은 끝자리 3개 이상 (치명적)");
+            totalScore = 0.0; // 치명적 실패
+        }
+
+        // 4-1. 같은 자리수(10단위) 검사
+        int sameRangeCount = getSameRangeMaxCount(sorted);
+        if (sameRangeCount >= 4) {
+            violations.add("같은 자리수 4개 이상 (치명적)");
+            totalScore = 0.0; // 치명적 실패
         }
         
         //5. 모두 홀수 또는 모두 짝수 - 테스트결과 : 각 경우 극히 드뭄.
@@ -216,14 +224,28 @@ public class PatternExclusionFilter implements LottoFilter {
         return false;
     }
     
-    // 4. 같은 끝자리 3개 이상
-    private boolean hasSameLastDigit(List<Integer> numbers) {
+    // 4. 같은 끝자리 최대 개수 확인
+    private int getSameLastDigitMaxCount(List<Integer> numbers) {
         Map<Integer, Integer> lastDigitCount = new HashMap<>();
         for (int num : numbers) {
             int lastDigit = num % 10;
             lastDigitCount.put(lastDigit, lastDigitCount.getOrDefault(lastDigit, 0) + 1);
         }
-        return lastDigitCount.values().stream().anyMatch(count -> count >= 3);
+        return lastDigitCount.values().stream()
+                .max(Integer::compare)
+                .orElse(0);
+    }
+
+    // 4-1. 같은 자리수(10단위) 최대 개수 확인
+    private int getSameRangeMaxCount(List<Integer> numbers) {
+        Map<Integer, Integer> rangeCount = new HashMap<>();
+        for (int num : numbers) {
+            int range = (num - 1) / 10; // 0: 1~10, 1: 11~20, 2: 21~30, 3: 31~40, 4: 41~45
+            rangeCount.put(range, rangeCount.getOrDefault(range, 0) + 1);
+        }
+        return rangeCount.values().stream()
+                .max(Integer::compare)
+                .orElse(0);
     }
     
     // 5. 모두 홀수 또는 모두 짝수

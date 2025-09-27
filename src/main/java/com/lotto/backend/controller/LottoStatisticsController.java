@@ -2,6 +2,7 @@ package com.lotto.backend.controller;
 
 import com.lotto.backend.model.dto.NumberFrequencyDto;
 import com.lotto.backend.model.dto.TrendAnalysisDto;
+import com.lotto.backend.service.LottoAnalysisService;
 import com.lotto.backend.service.LottoStatisticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class LottoStatisticsController {
     private final LottoStatisticsService statisticsService;
+    private final LottoAnalysisService analysisService;
     
     // 번호별 출현 빈도
     @GetMapping("/frequency")
@@ -68,5 +70,17 @@ public class LottoStatisticsController {
     @GetMapping("/overdue-numbers")
     public List<Map<String, Object>> getOverdueNumbers() {
         return statisticsService.getOverdueNumbers();
+    }
+
+    // 같은 끝자리 패턴 분석
+    @GetMapping("/last-digit-analysis")
+    public Map<String, Object> getLastDigitAnalysis() {
+        return analysisService.analyzeLastDigitStatistics();
+    }
+
+    // 같은 자리수(10단위) 패턴 분석
+    @GetMapping("/same-range-analysis")
+    public Map<String, Object> getSameRangeAnalysis() {
+        return analysisService.analyzeSameRangeStatistics();
     }
 }
