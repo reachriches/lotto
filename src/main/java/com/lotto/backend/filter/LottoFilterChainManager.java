@@ -10,90 +10,96 @@ import java.util.stream.Collectors;
 public class LottoFilterChainManager {
     private final List<LottoFilter> filters;
     private final Map<String, LottoFilter> filterMap;
-    
+
     public LottoFilterChainManager(List<LottoFilter> filters) {
         this.filters = filters.stream()
                 .sorted(Comparator.comparing(LottoFilter::getPriority))
                 .collect(Collectors.toList());
-        
+
         this.filterMap = filters.stream()
                 .collect(Collectors.toMap(LottoFilter::getName, Function.identity()));
     }
-    
-    public FilterChainResult applyFilters(List<Integer> numbers, 
-                                         Set<String> activeFilters,
-                                         LottoContext context) {
+
+    public FilterChainResult applyFilters(List<Integer> numbers,
+                                          Set<String> activeFilters,
+                                          LottoContext context) {
         List<FilterResult> results = new ArrayList<>();
         List<Integer> currentNumbers = new ArrayList<>(numbers);
-        
+
         for (LottoFilter filter : filters) {
             if (shouldApplyFilter(filter, activeFilters)) {
                 FilterResult result = filter.apply(currentNumbers, context);
                 results.add(result);
-                
+
                 if (result.getAdjustedNumbers() != null && !result.getAdjustedNumbers().isEmpty()) {
                     currentNumbers = result.getAdjustedNumbers();
                 }
             }
         }
-        
+
         double totalScore = calculateTotalScore(results, context);
         return new FilterChainResult(currentNumbers, results, totalScore);
     }
-    
+
     public FilterChainResult applyAllEnabledFilters(List<Integer> numbers, LottoContext context) {
         Set<String> allEnabledFilters = filters.stream()
                 .filter(LottoFilter::isEnabled)
                 .map(LottoFilter::getName)
                 .collect(Collectors.toSet());
-        
+
         return applyFilters(numbers, allEnabledFilters, context);
     }
-    
+
     public Set<String> getDefaultFilters() {
         return Set.of("ac-value", "delta-system", "sum-distribution", "prime-balance");
     }
-    
+
     public Set<String> getAllFilterNames() {
         return filterMap.keySet();
     }
-    
+
     public Map<String, Boolean> getFilterStatus() {
         return filters.stream()
                 .collect(Collectors.toMap(
-                    LottoFilter::getName,
-                    LottoFilter::isEnabled
+                        LottoFilter::getName,
+                        LottoFilter::isEnabled
                 ));
     }
-    
+
     private boolean shouldApplyFilter(LottoFilter filter, Set<String> activeFilters) {
         if (activeFilters == null || activeFilters.isEmpty()) {
             return filter.isEnabled();
         }
         return activeFilters.contains(filter.getName()) && filter.isEnabled();
     }
-    
+
     private double calculateTotalScore(List<FilterResult> results, LottoContext context) {
         if (results.isEmpty()) {
             return 0.0;
         }
-        
+
         // 1. 치명적 필터 체크 (즉시 0점 반환)
         for (FilterResult result : results) {
             if (isCriticalFailure(result)) {
                 return 0.0;
             }
         }
-        
-        // 2. 나머지는 곱연산으로 계산
-        double totalScore = 1.0;
+
+        // 2. 나머지는 가중평균으로 계산
+        Map<String, Double> weights = getDefaultWeights();
+        double weightedSum = 0.0;
+        double totalWeight = 0.0;
+
         for (FilterResult result : results) {
-            totalScore *= result.getScore();
+            String filterName = getFilterNameFromResult(result);
+            double weight = weights.getOrDefault(filterName, weights.get("unknown"));
+            weightedSum += result.getScore() * weight;
+            totalWeight += weight;
         }
-        
-        return totalScore;
+
+        return totalWeight > 0 ? weightedSum / totalWeight : 0.0;
     }
-    
+
     private String getFilterNameFromResult(FilterResult result) {
         if (result.getReason() != null) {
             if (result.getReason().contains("AC값")) return "ac-value";
@@ -106,7 +112,7 @@ public class LottoFilterChainManager {
         }
         return "unknown";
     }
-    
+
     private Map<String, Double> getDefaultWeights() {
         Map<String, Double> weights = new HashMap<>();
         weights.put("ac-value", 0.15);
@@ -114,6 +120,8 @@ public class LottoFilterChainManager {
         weights.put("prime-balance", 0.05);
         weights.put("sum-distribution", 0.20);
         weights.put("position-analysis", 0.10);
+        //weights.put("pattern-exclusion", 0.20);
+        //weights.put("recent-history", 0.15);
         weights.put("unknown", 0.05);
         return weights;
     }
@@ -121,7 +129,7 @@ public class LottoFilterChainManager {
     public EvaluationResult evaluateFilters(List<FilterResult> results, double minScore) {
         // 1. 치명적 필터만 체크 (즉시 탈락)
         boolean hasCriticalFailure = results.stream()
-                .anyMatch(r -> isCriticalFailure(r));
+                .anyMatch(this::isCriticalFailure);
 
         if (hasCriticalFailure) {
             return EvaluationResult.CRITICAL_FAILURE;
@@ -131,32 +139,28 @@ public class LottoFilterChainManager {
         double totalScore = calculateTotalScore(results, null);
         return totalScore >= minScore ? EvaluationResult.PASS : EvaluationResult.FAIL;
     }
-    
+
     private boolean isCriticalFailure(FilterResult result) {
         String filterName = getFilterNameFromResult(result);
-        
+
         // 치명적 패턴들 정의
-        switch (filterName) {
-            case "pattern-exclusion":
+        return switch (filterName) {
+            case "pattern-exclusion" ->
                 // 극단적 패턴들 (모든 홀수/짝수, 연속번호 4개+, 등차수열 등)
-                return result.getScore() <= 0.0;
-                
-            case "recent-history":
+                    result.getScore() <= 0.0;
+            case "recent-history" ->
                 // 과거 당첨번호와 완전 일치, 최근 번호와 과도한 중복
-                return result.getScore() <= 0.0;
-                
-            case "sum-distribution":
+                    result.getScore() <= 0.0;
+            case "sum-distribution" ->
                 // 극단값 (60미만, 260초과)
-                return result.getScore() <= 0.0;
-                
-            default:
-                return false;
-        }
+                    result.getScore() <= 0.0;
+            default -> false;
+        };
     }
-    
+
     public enum EvaluationResult {
         PASS,
-        FAIL, 
+        FAIL,
         CRITICAL_FAILURE
     }
 
